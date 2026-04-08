@@ -1,0 +1,45 @@
+{
+	"version": 6,
+	"configurePresets": [
+		{
+			"name": "install",
+			"binaryDir": "build.install"
+		},
+		{
+			"name": "tests",
+			"binaryDir": "build.tests",
+			"cacheVariables": {
+				"BUILD_TESTS": "ON"
+			}
+		}
+	],
+	"buildPresets": [
+		{
+			"name": "tests",
+			"configurePreset": "tests",
+			"targets": [
+				"test_pipebuf",
+				"test_unique_fd"
+			]
+		}
+	],
+	"testPresets": [
+		{
+			"name": "tests",
+			"configurePreset": "tests",
+			"output": {
+				"outputOnFailure": true
+			}
+		}
+	],
+	"workflowPresets": [
+		{
+			"name": "tests",
+			"steps": [
+				{ "type": "configure", "name": "tests" },
+				{ "type": "build", "name": "tests" },
+				{ "type": "test", "name": "tests" }
+			]
+		}
+	]
+}
