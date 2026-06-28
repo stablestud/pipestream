@@ -10,6 +10,7 @@
 			"binaryDir": "build.tests",
 			"cacheVariables": {
 				"BUILD_TESTS": "ON",
+				"ENABLE_ASAN": "OFF",
 				"CMAKE_BUILD_TYPE": "Debug"
 			}
 		}
@@ -19,8 +20,7 @@
 			"name": "tests",
 			"configurePreset": "tests",
 			"targets": [
-				"test_pipebuf",
-				"test_unique_fd"
+				"tests"
 			]
 		}
 	],

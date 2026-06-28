@@ -13,8 +13,9 @@ target_include_directories(pipestream
 )
 
 option(BUILD_TESTS "run tests" OFF)
+option(ENABLE_ASAN "enable address sanitizers" OFF)
 
-if (${BUILD_TESTS})
+if(${BUILD_TESTS})
 	enable_testing()
 	add_subdirectory(tests)
 endif()
