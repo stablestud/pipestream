@@ -75,25 +75,25 @@ TEST_SUITE("fd")
 		CHECK(not fd.has_valid_fd());
 	}
 
-	TEST_CASE("should return false on close() with valid fd")
+	TEST_CASE("should return true on close() with valid fd")
 	{
 		int pipe_fd[2];
 		CHECK_EQ(::pipe(pipe_fd), 0);
 		pipestream::fd fd{pipe_fd[0]};
-		CHECK_FALSE(fd.close());
+		CHECK(fd.close());
 		::close(pipe_fd[1]);
 	}
 
-	TEST_CASE("should return false on close() with already closed fd")
+	TEST_CASE("should return true on close() with already closed fd")
 	{
 		pipestream::fd fd{pipestream::fd::none};
-		CHECK_FALSE(fd.close());
+		CHECK(fd.close());
 	}
 
-	TEST_CASE("should return true on close() with invalid fd")
+	TEST_CASE("should return false on close() with invalid fd")
 	{
 		pipestream::fd fd{INVALID_FD};
-		CHECK(fd.close());
+		CHECK_FALSE(fd.close());
 	}
 
 	TEST_CASE("should close fd on close()")
@@ -102,8 +102,8 @@ TEST_SUITE("fd")
 		CHECK_FALSE(::pipe(pipe_fd));
 		pipestream::fd fd0(pipe_fd[0]);
 		pipestream::fd fd1(pipe_fd[1]);
-		CHECK_FALSE(fd0.close());
-		CHECK_FALSE(fd1.close());
+		CHECK(fd0.close());
+		CHECK(fd1.close());
 		CHECK_EQ(::close(pipe_fd[0]), -1);
 		CHECK_EQ(::close(pipe_fd[0]), -1);
 	}

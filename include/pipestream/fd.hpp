@@ -55,11 +55,11 @@ namespace pipestream
 		virtual bool close()
 		{
 			if (none == basic_fd) {
-				return false;
+				return true;
 			}
 			int ret = ::close(basic_fd);
 			basic_fd = none;
-			return ret;
+			return not ret;
 		}
 
 		virtual bool has_valid_fd() const
