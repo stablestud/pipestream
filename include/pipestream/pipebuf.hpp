@@ -253,7 +253,7 @@ protected:
 				*pptr() = ch;
 				this->pbump(1);
 			}
-			if (flush()) {
+			if (!flush()) {
 				// Flushing has failed
 				this->pbump(-1); // Need to make room for future writes, dropping last character
 				return traits_type::eof(); // Notify client that write of last character has failed
@@ -286,7 +286,7 @@ protected:
 
 	virtual int sync() override
 	{
-		if (flush()) {
+		if (!flush()) {
 			// Flush buffer failed
 			return -1;
 		}
@@ -303,24 +303,24 @@ private:
 	{
 		if (pbase() == pptr()) {
 			// Nothing to flush, return early
-			return false;
+			return true;
 		}
 		const std::streamsize buf_writeable = pptr()-pbase();
 		const string_view_type buf(pbase(), buf_writeable);
 		const std::streamsize n_chars = pipe_write(buf);
 		if (not n_chars) {
 			// Nothing was written, failed write
-			return true;
+			return false;
 		}
 		if (n_chars not_eq buf_writeable) {
 			// Not all characters could be written
 			this->setp(pbase()+n_chars, epptr()); // Remove written chars from buffer
 			this->pbump(buf_writeable-n_chars);
-			return true;
+			return false; // returning "error" to let client know flushing was not completely successful
 		}
 		// Successfully flushed whole buffer
 		reset_put_buf();
-		return false;
+		return true;
 	}
 
 	void set_buf_ptrs(char_type* new_buf, const std::streamsize n)
