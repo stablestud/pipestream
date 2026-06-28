@@ -333,11 +333,12 @@ private:
 		}
 		buf = new_buf;
 		buf_size = n;
-		this->setg(buf+buf_size, buf+buf_size, buf+buf_size);
 		if (nullptr == buf) {
 			this->setp(nullptr, nullptr);
+			this->setg(nullptr, nullptr, nullptr);
 		} else {
 			reset_put_buf();
+			this->setg(buf+buf_size, buf+buf_size, buf+buf_size);
 		}
 	}
 
