@@ -3,6 +3,7 @@
 #include <cstring>
 #include <string>
 #include <thread>
+#include <utility>
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -109,6 +110,18 @@ namespace
 		MAKE_MOCK0(close, bool(void), override);
 		MAKE_CONST_MOCK2(read, std::streamsize(void*, const std::streamsize), override);
 		MAKE_CONST_MOCK2(write, std::streamsize(const void*, const std::streamsize), override);
+
+		template<typename CharT = char, typename Buffer>
+		std::streamsize read(Buffer buf)
+		{
+			return pipestream::fd::read<CharT>(std::forward<Buffer>(buf));
+		}
+
+		template<typename CharT = char, typename BufferView>
+		std::streamsize write(BufferView bufv)
+		{
+			return pipestream::fd::write<CharT>(std::forward<BufferView>(bufv));
+		}
 	};
 
 	template<typename T>
