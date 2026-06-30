@@ -14,7 +14,13 @@ namespace pipestream
 template<typename CharT>
 class buffer_view {
 public:
+	using value_type = CharT;
+	using reference  = CharT&;
+	using const_reference = const CharT&;
+
 	buffer_view(CharT *const data, const std::size_t size) : data_(data), size_(size) {}
+	template<typename Traits>
+	explicit buffer_view(std::basic_string_view<CharT, Traits> str) : buffer_view(str.data(), str.size()) {}
 	template<typename Traits, typename Alloc>
 	explicit buffer_view(std::basic_string<CharT, Traits, Alloc>& str) : buffer_view(str.data(), str.size()) {}
 	

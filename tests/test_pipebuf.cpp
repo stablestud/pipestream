@@ -111,16 +111,16 @@ namespace
 		MAKE_CONST_MOCK2(read, std::streamsize(void*, const std::streamsize), override);
 		MAKE_CONST_MOCK2(write, std::streamsize(const void*, const std::streamsize), override);
 
-		template<typename CharT = char, typename Buffer>
-		std::streamsize read(Buffer buf)
+		template<typename Buffer>
+		std::streamsize read(Buffer& buf)
 		{
-			return pipestream::fd::read<CharT>(std::forward<Buffer>(buf));
+			return pipestream::fd::read<Buffer>(buf);
 		}
 
-		template<typename CharT = char, typename BufferView>
-		std::streamsize write(BufferView bufv)
+		template<typename BufferView>
+		std::streamsize write(const BufferView bufv)
 		{
-			return pipestream::fd::write<CharT>(std::forward<BufferView>(bufv));
+			return pipestream::fd::write<BufferView>(bufv);
 		}
 	};
 

@@ -86,16 +86,16 @@ namespace pipestream
 			return ::write(basic_fd, buf, n_bytes);
 		}
 
-		template<typename CharT = char, typename Buffer>
-		std::streamsize read(Buffer buf)
+		template<typename Buffer>
+		std::streamsize read(Buffer& buf)
 		{
-			return read(buf.data(), buf.size()*sizeof(CharT));
+			return read(buf.data(), buf.size()*sizeof(typename Buffer::value_type));
 		}
 
-		template<typename CharT = char, typename BufferView>
-		std::streamsize write(BufferView bufv)
+		template<typename BufferView>
+		std::streamsize write(const BufferView bufv)
 		{
-			return write(bufv.data(), bufv.size()*sizeof(CharT));
+			return write(bufv.data(), bufv.size()*sizeof(typename BufferView::value_type));
 		}
 
 		static inline constexpr fd_type none = -1;
