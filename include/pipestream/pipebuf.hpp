@@ -214,6 +214,7 @@ protected:
 		char_type putback;
 		std::streamsize offset{};
 		if (egptr() not_eq eback()) {
+			// Buffer is populated (not empty)
 			putback = *(egptr()-1);
 			offset = 1;
 		}
@@ -349,7 +350,7 @@ private:
 			return 0;
 		}
 		// TODO probably not here but if partial is not 0 then we need to slightly adjust the string given to fd.write to also include rest of partial
-		const std::streamsize n = pipe_fd.write(client_buf.data(), sizeof(char_type) * client_buf.size());
+		const std::streamsize n = pipe_fd.write(client_buf);
 		if (n <= 0) {
 			return 0;
 		}
@@ -372,7 +373,7 @@ private:
 			return 0;
 		}
 		// TODO probably not here but if partial is not 0 then we need to slightly adjust the string given to fd.write to also include rest of partial
-		const std::streamsize n = pipe_fd.write(buf.data(), sizeof(char_type) * buf.size());
+		const std::streamsize n = pipe_fd.write(buf);
 		if (n <= 0) {
 			return 0;
 		}
@@ -394,7 +395,7 @@ private:
 			// Pipe is not correctly setup, return early
 			return 0;
 		}
-		const std::streamsize n = pipe_fd.read(client_buf.data(), sizeof(char_type) * client_buf.size());
+		const std::streamsize n = pipe_fd.read(client_buf);
 		if constexpr (is_multibyte_v<char_type>) {
 			if (0 != (partial = (n+partial)%sizeof(char_type))) {
 				// A character has been partially read
@@ -434,7 +435,7 @@ private:
 			// Pipe is not correctly setup, return early
 			return 0;
 		}
-		const std::streamsize n = pipe_fd.read(buf.data(), sizeof(char_type) * buf.size());
+		const std::streamsize n = pipe_fd.read(buf);
 		if constexpr (is_multibyte_v<char_type>) {
 			if (0 != (partial = (n+partial)%sizeof(char_type))) {
 				// A character has been partially read
