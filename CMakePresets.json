@@ -19,6 +19,7 @@
 		{
 			"name": "tests",
 			"configurePreset": "tests",
+			"jobs": 0,
 			"targets": [
 				"tests"
 			]
@@ -30,6 +31,9 @@
 			"configurePreset": "tests",
 			"output": {
 				"outputOnFailure": true
+			},
+			"execution": {
+				"jobs": 0
 			}
 		}
 	],
