@@ -9,8 +9,8 @@
 			"name": "tests",
 			"binaryDir": "build.tests",
 			"cacheVariables": {
-				"BUILD_TESTS": "ON",
-				"ENABLE_ASAN": "OFF",
+				"ENABLE_TESTS": "ON",
+				"ENABLE_ASAN": "ON",
 				"CMAKE_BUILD_TYPE": "Debug"
 			}
 		}

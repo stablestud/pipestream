@@ -12,10 +12,9 @@ target_include_directories(pipestream
 		$<INSTALL_INTERFACE:include>
 )
 
-option(BUILD_TESTS "run tests" OFF)
-option(ENABLE_ASAN "enable address sanitizers" OFF)
+option(ENABLE_TESTS "run tests" OFF)
 
-if(${BUILD_TESTS})
+if(${ENABLE_TESTS})
 	enable_testing()
 	add_subdirectory(tests)
 endif()
