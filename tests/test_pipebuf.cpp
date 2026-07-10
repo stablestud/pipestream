@@ -104,7 +104,7 @@ namespace
 
 	class mocked_fd : public pipestream::fd {
 	public:
-		explicit mocked_fd(const pipestream::fd_type basic_fd) : pipestream::fd(basic_fd) {};
+		explicit mocked_fd(const pipestream::fd_type input_fd) : pipestream::fd(input_fd) {};
 		explicit mocked_fd() : pipestream::fd(DUMMY_FD) {};
 		static constexpr bool trompeloeil_movable_mock = true;
 		MAKE_MOCK0(close, bool(void), override);

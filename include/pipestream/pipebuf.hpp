@@ -47,9 +47,9 @@ public:
 
 	basic_pipebuf(Fd&& move_fd) : pipe_fd(std::move(move_fd))
 	{
-		constexpr std::size_t buf_size = 4096;
-		std::unique_ptr<char_type[]> new_buf = std::make_unique<char_type[]>(buf_size);
-		set_buf_ptrs(new_buf.get(), buf_size);
+		constexpr std::size_t DEFAULT_BUFFER_SIZE = 4096;
+		std::unique_ptr<char_type[]> new_buf = std::make_unique<char_type[]>(DEFAULT_BUFFER_SIZE);
+		set_buf_ptrs(new_buf.get(), DEFAULT_BUFFER_SIZE);
 		self_managed = std::move(new_buf);
 	}
 
@@ -307,8 +307,8 @@ private:
 			return true;
 		}
 		const std::streamsize buf_writeable = pptr()-pbase();
-		const string_view_type buf(pbase(), buf_writeable);
-		const std::streamsize n_chars = pipe_write(buf);
+		const string_view_type buf_view(pbase(), buf_writeable);
+		const std::streamsize n_chars = pipe_write(buf_view);
 		if (not n_chars) {
 			// Nothing was written, failed write
 			return false;
@@ -366,14 +366,14 @@ private:
 		return n/sizeof(char_type);
 	}
 
-	std::streamsize pipe_write(const string_view_type buf) noexcept
+	std::streamsize pipe_write(const string_view_type buf_view) noexcept
 	{
 		if (not pipe_fd.has_valid_fd()) {
 			// Pipe is not correctly setup, return early
 			return 0;
 		}
 		// TODO probably not here but if partial is not 0 then we need to slightly adjust the string given to fd.write to also include rest of partial
-		const std::streamsize n = pipe_fd.write(buf);
+		const std::streamsize n = pipe_fd.write(buf_view);
 		if (n <= 0) {
 			return 0;
 		}
@@ -429,13 +429,13 @@ private:
 		return n/sizeof(char_type);
 	}
 
-	std::streamsize pipe_read(buffer_view_type buf) noexcept
+	std::streamsize pipe_read(buffer_view_type buf_view) noexcept
 	{
 		if (not pipe_fd.has_valid_fd()) {
 			// Pipe is not correctly setup, return early
 			return 0;
 		}
-		const std::streamsize n = pipe_fd.read(buf);
+		const std::streamsize n = pipe_fd.read(buf_view);
 		if constexpr (is_multibyte_v<char_type>) {
 			if (0 != (partial = (n+partial)%sizeof(char_type))) {
 				// A character has been partially read

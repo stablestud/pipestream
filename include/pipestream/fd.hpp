@@ -9,7 +9,7 @@ namespace pipestream
 
 	class fd {
 	public:
-		explicit fd(fd_type basic_fd) : basic_fd(basic_fd) {};
+		explicit fd(fd_type input_fd) : basic_fd(input_fd) {};
 		virtual ~fd() noexcept
 		{
 			close();
