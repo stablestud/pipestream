@@ -164,8 +164,8 @@ protected:
 			return unbuffered_read(client_buf);
 		}
 		const std::streamsize buf_readable = egptr()-gptr();
-		if (buf_readable >= client_buf.size()) {
-			// Data is available in buffer, copy from buffer to array
+		if (0 < buf_readable and buf_readable >= client_buf.size()) {
+			// Data is fully available in buffer, copy from buffer to array
 			std::memcpy(client_buf.data(), gptr(), client_buf.size()*sizeof(char_type));
 			this->gbump(client_buf.size());
 			return client_buf.size();

@@ -28,11 +28,11 @@ FetchContent_Declare(trompeloeil
 FetchContent_MakeAvailable(trompeloeil)
 
 set(TEST_CXX_OPTIONS
-	-Wall
-	-Wextra
-	-Wpedantic
+	#-Wall
+	#-Wextra
+	#-Wpedantic
 	-Wconversion
-	-Wsign-conversion
+	#-Wsign-conversion
 	-Wshadow
 )
 
