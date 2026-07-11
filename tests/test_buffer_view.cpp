@@ -7,6 +7,16 @@
 
 #include "testutils.hpp"
 
+namespace
+{
+	struct char_view_like {
+		using value_type = char;
+
+		std::size_t size() { return 0; }
+		char*       data() { return nullptr; }
+	};
+}
+
 TEST_SUITE("buffer_view")
 {
 	TEST_CASE("should return given data")
@@ -23,5 +33,13 @@ TEST_SUITE("buffer_view")
 		const pipestream::buffer_view<T> view{str};
 		CHECK_EQ(view.size(), str.size());
 		CHECK_EQ(view.data(), str.data());
+	}
+
+	/* Below are compile time tests only, thats why they are skipped in doctest */
+
+	TEST_CASE("should accept custom char container" * doctest::skip())
+	{
+		char_view_like custom{};
+		const pipestream::buffer_view<char_view_like::value_type> view{custom};
 	}
 }

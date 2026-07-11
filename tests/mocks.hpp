@@ -11,7 +11,8 @@
 
 #include "testutils.hpp"
 
-namespace pipestream::mocks {
+namespace pipestream::mocks
+{
 	class mocked_fd : public pipestream::fd {
 	public:
 		explicit mocked_fd(const pipestream::fd_type input_fd) : pipestream::fd(input_fd) {};

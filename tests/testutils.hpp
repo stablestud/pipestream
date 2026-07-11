@@ -7,7 +7,8 @@
 
 #include <pipestream/pipestream.hpp>
 
-namespace pipestream::testutils {
+namespace pipestream::testutils
+{
 	constexpr pipestream::fd_type DUMMY_FD = 999;
 	constexpr pipestream::fd_type INVALID_FD = -999;
 
