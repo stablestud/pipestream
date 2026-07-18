@@ -18,6 +18,7 @@ public:
 	using reference  = CharT&;
 	using const_reference = const CharT&;
 
+	buffer_view(void) : data_(nullptr), size_(0) {}
 	buffer_view(CharT *const data, const std::size_t size) : data_(data), size_(size) {}
 	template<typename View>
 	explicit buffer_view(View& view) : buffer_view(view.data(), view.size()) {}
@@ -32,12 +33,14 @@ public:
 		return data_;
 	}
 
+	CharT* c_str() const
+	{
+		return data();
+	}
+
 	bool empty() const
 	{
-		if (0 == size_ or nullptr == data_) {
-			return true;
-		}
-		return false;
+		return 0 == size_ or nullptr == data_;
 	}
 private:
 	CharT *const data_;

@@ -349,7 +349,6 @@ private:
 			// Pipe is not correctly setup, return early
 			return 0;
 		}
-		// TODO probably not here but if partial is not 0 then we need to slightly adjust the string given to fd.write to also include rest of partial
 		const std::streamsize n = pipe_fd.write(client_buf);
 		if (n <= 0) {
 			return 0;

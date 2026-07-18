@@ -23,8 +23,9 @@ TEST_SUITE("buffer_view")
 	{
 		std::string str{"Hello World!"};
 		const pipestream::buffer_view<char> view{str.data(), str.size()};
-		CHECK_EQ(view.size(), str.size());
-		CHECK_EQ(view.data(), str.data());
+		CHECK_EQ(view.size(),  str.size());
+		CHECK_EQ(view.data(),  str.data());
+		CHECK_EQ(view.c_str(), str.data());
 	}
 
 	TEST_CASE_TEMPLATE("should accept std::basic_string<T> in ctor", T, char, wchar_t)
@@ -33,6 +34,13 @@ TEST_SUITE("buffer_view")
 		const pipestream::buffer_view<T> view{str};
 		CHECK_EQ(view.size(), str.size());
 		CHECK_EQ(view.data(), str.data());
+	}
+
+	TEST_CASE_TEMPLATE("should allow empty/nullptr buffer_view creation", T, char, wchar_t)
+	{
+		const pipestream::buffer_view<T> view{};
+		CHECK_EQ(view.size(), 0);
+		CHECK_EQ(view.data(), nullptr);
 	}
 
 	/* Below are compile time tests only, thats why they are skipped in doctest */
