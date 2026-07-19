@@ -275,9 +275,10 @@ protected:
 	}
 private:
 	Fd pipe_fd;
+	char_type*  buf;
 	std::size_t buf_size; 
-	char_type* buf;
 	std::size_t partial{};
+	char_type   partial_buf;
 	std::unique_ptr<char_type[]> self_managed;
 
 	void set_buf_ptrs(char_type* new_buf, const std::streamsize n)
@@ -377,15 +378,27 @@ private:
 			// Pipe or buffer not correctly setup, return early
 			return 0;
 		}
-		const auto n_bytes = pipe_fd.read(buf_view);
+		const auto n_bytes = [&]() -> auto {
+			if constexpr (is_multibyte_v<char_type>) {
+				if (0 != partial) {
+					// Last time character was partial, add partial bits to buffer
+					buf_view.data()[0] = partial_buf;
+					return pipe_fd.read(reinterpret_cast<char*>(buf_view.data())+partial, buf_view.size()*sizeof(char_type)-partial); 
+				}
+			}
+			return pipe_fd.read(buf_view);
+		}();
 		if (0 >= n_bytes) {
 			return 0;
 		}
 		const auto n_chars = n_bytes/sizeof(char_type);
 		if constexpr (is_multibyte_v<char_type>) {
+			const auto n_chars_p = (n_bytes+partial)/sizeof(char_type);
 			if (0 != (partial = (n_bytes+partial)%sizeof(char_type))) {
 				// A character has been partially read
+				partial_buf = buf_view.data()[n_chars];
 			}
+			return n_chars_p;
 		}
 		return n_chars;
 	}

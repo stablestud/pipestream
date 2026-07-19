@@ -671,7 +671,7 @@ TEST_SUITE("sgetc()")
 		CHECK_EQ(buf.sgetc(), pipestream::basic_pipebuf<T>::traits_type::eof());
 	}
 
-	TEST_CASE_TEMPLATE("should return character after partial character read on sgetc()" * doctest::skip(), T, wchar_t, char16_t, char32_t)
+	TEST_CASE_TEMPLATE("should return character after partial character read on sgetc()", T, wchar_t, char16_t, char32_t)
 	{
 		static_assert(pipestream::is_multibyte_v<T>);
 		using int_type = typename pipestream::basic_pipebuf<T>::int_type;
@@ -1257,7 +1257,7 @@ TEST_SUITE("sgetn()")
 		CHECK_EQ(buf.sgetn(dst, str.size()), read_bytes/sizeof(T));
 	}
 
-	TEST_CASE_TEMPLATE("should continue reading character+string after partial character read on sgetn()" * doctest::skip(), T, wchar_t, char16_t, char32_t)
+	TEST_CASE_TEMPLATE("should continue reading character+string after partial character read on sgetn()", T, wchar_t, char16_t, char32_t)
 	{
 		static_assert(pipestream::is_multibyte_v<T>);
 		const std::basic_string<T> str1{make_string<T>("Hello")};
@@ -1285,7 +1285,7 @@ TEST_SUITE("sgetn()")
 				.SIDE_EFFECT(std::memcpy(_1, reinterpret_cast<const char*>(combined.c_str())+read1bytes+read2bytes, read3bytes))
 				.TIMES(1)
 				.RETURN(read3bytes);
-		CHECK_EQ(buf.sgetn(dst+str1.size(), str2.size()), read3bytes/sizeof(T)+1); // 3rd read with partial character and rest of the string
+		CHECK_EQ(buf.sgetn(dst+str1.size(), str2.size()), str2.size()); // 3rd read with partial character and rest of the string
 		CHECK_EQ(std::memcmp(dst, combined.c_str(), combined.size()), 0);
 	}
 }
