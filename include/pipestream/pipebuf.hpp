@@ -55,7 +55,7 @@ public:
 
 	virtual ~basic_pipebuf() override
 	{
-		flush();
+		buffer_flush();
 	}
 
 	basic_pipebuf(const basic_pipebuf<CharT, Traits, Fd>&) = delete;
@@ -110,7 +110,7 @@ protected:
 		const string_view_type client_buf(s, count);
 		if (nullptr == buf) {
 			// No buffer available write directly into pipe
-			return unbuffered_write(client_buf);
+			return pipe_write(client_buf);
 		}
 		const std::streamsize buf_writeable = pptr()-pbase();
 		if ((epptr() - pptr()) >= count) {
@@ -120,13 +120,12 @@ protected:
 			return count;
 		}
 		if (0 < buf_writeable) {
-
 			// Buffer not empty and string does not fit into buffer,
 			// combine buffer and string and write directly to pipe
 			string_type aux{};
 			aux.append(pbase(), buf_writeable);
 			aux.append(client_buf);
-			const std::streamsize written = pipe_write(aux);
+			const auto written = pipe_write(aux);
 			if (0 == written) {
 				// Nothing has been written to pipe
 				return 0;
@@ -161,7 +160,7 @@ protected:
 		buffer_view_type client_buf{s, static_cast<std::size_t>(count)};
 		if (nullptr == buf) {
 			// No buffer available read directly from pipe
-			return unbuffered_read(client_buf);
+			return pipe_read(client_buf);
 		}
 		const std::streamsize buf_readable = egptr()-gptr();
 		if (0 < buf_readable and buf_readable >= client_buf.size()) {
@@ -201,7 +200,7 @@ protected:
 			// No buffer to populate, read single character directly from pipe
 			char_type c;
 			buffer_view_type cview{&c, 1};
-			if (unbuffered_read(cview) <= 0) {
+			if (pipe_read(cview) <= 0) {
 				return traits_type::eof();
 			}
 			return traits_type::to_int_type(c);
@@ -224,8 +223,9 @@ protected:
 	virtual int_type overflow(const int_type ch = traits_type::eof()) override
 	{
 		if (nullptr == buf) {
-			const string_type c(1, traits_type::to_char_type(ch));
-			if (not pipe_write(c)) {
+			const char_type c{traits_type::to_char_type(ch)};
+			string_view_type cv(&c, 1);
+			if (not pipe_write(cv)) {
 				return traits_type::eof();
 			}
 		} else {
@@ -235,7 +235,7 @@ protected:
 				*pptr() = ch;
 				this->pbump(1);
 			}
-			if (!flush()) {
+			if (!buffer_flush()) {
 				// Flushing has failed
 				this->pbump(-1); // Need to make room for future writes, dropping last character
 				return traits_type::eof(); // Notify client that write of last character has failed
@@ -268,7 +268,7 @@ protected:
 
 	virtual int sync() override
 	{
-		if (!flush()) {
+		if (!buffer_flush()) {
 			// Flush buffer failed
 			return -1;
 		}
@@ -280,30 +280,6 @@ private:
 	char_type* buf;
 	std::size_t partial{};
 	std::unique_ptr<char_type[]> self_managed;
-
-	bool flush()
-	{
-		if (pbase() == pptr()) {
-			// Nothing to flush, return early
-			return true;
-		}
-		const std::streamsize buf_writeable = pptr()-pbase();
-		const string_view_type buf_view(pbase(), buf_writeable);
-		const std::streamsize n_chars = pipe_write(buf_view);
-		if (not n_chars) {
-			// Nothing was written, failed write
-			return false;
-		}
-		if (n_chars not_eq buf_writeable) {
-			// Not all characters could be written
-			this->setp(pbase()+n_chars, epptr()); // Remove written chars from buffer
-			this->pbump(buf_writeable-n_chars);
-			return false; // returning "error" to let client know flushing was not completely successful
-		}
-		// Successfully flushed whole buffer
-		reset_put_buf();
-		return true;
-	}
 
 	void set_buf_ptrs(char_type* new_buf, const std::streamsize n)
 	{
@@ -324,65 +300,29 @@ private:
 		}
 	}
 
-	std::streamsize unbuffered_write(const string_view_type client_buf)
+	bool buffer_flush()
 	{
-		if (not pipe_fd.has_valid_fd()) {
-			// Pipe is not correctly setup, return early
-			return 0;
+		if (pbase() == pptr()) {
+			// Nothing to flush, return early
+			// Also applies for nullptr buf
+			return true;
 		}
-		const std::streamsize n = pipe_fd.write(client_buf);
-		if (n <= 0) {
-			return 0;
+		const auto buf_writeable = pptr()-pbase();
+		const string_view_type buf_view(pbase(), buf_writeable);
+		const auto n_chars = pipe_write(buf_view);
+		if (not n_chars) {
+			// Nothing was written, failed write
+			return false;
 		}
-		if constexpr (is_multibyte_v<char_type>) {
-			bool full_chars_written = n/sizeof(char_type);
-			bool partial_written = n%sizeof(char_type);
-			// TODO need to ensure that ojn partial write it is still counted as full char written on return type
-			// if partial written, put the rest into buffer and setup ptr and partial counter to note how much is available in buffer and where
-			// but what to do if second write is also partial, so if previous was partial, and this one also (n-partial)/sizeof(char_type) than we had again a partial write, then setup partial and buf and ptr again
-			// A character has been partially written
-			return (n+partial)/sizeof(char_type);
+		if (n_chars not_eq buf_writeable) {
+			// Not all characters could be written
+			this->setp(pbase()+n_chars, epptr()); // Remove written chars from buffer
+			this->pbump(buf_writeable-n_chars);
+			return false; // returning "error" to let client know flushing was not completely successful
 		}
-		return n/sizeof(char_type);
-	}
-
-	std::streamsize pipe_write(const string_view_type buf_view)
-	{
-		if (not pipe_fd.has_valid_fd()) {
-			// Pipe is not correctly setup, return early
-			return 0;
-		}
-		// TODO probably not here but if partial is not 0 then we need to slightly adjust the string given to fd.write to also include rest of partial
-		const std::streamsize n = pipe_fd.write(buf_view);
-		if (n <= 0) {
-			return 0;
-		}
-		if constexpr (is_multibyte_v<char_type>) {
-			bool full_chars_written = n/sizeof(char_type);
-			bool partial_written = n%sizeof(char_type);
-			// TODO need to ensure that ojn partial write it is still counted as full char written on return type
-			// if partial written, put the rest into buffer and setup ptr and partial counter to note how much is available in buffer and where
-			// but what to do if second write is also partial, so if previous was partial, and this one also (n-partial)/sizeof(char_type) than we had again a partial write, then setup partial and buf and ptr again
-			// A character has been partially written
-			return (n+partial)/sizeof(char_type);
-		}
-		return n/sizeof(char_type);
-	}
-
-	std::size_t unbuffered_read(buffer_view_type client_buf)
-	{
-		const auto n_bytes = pipe_read(client_buf);
-		if constexpr (is_multibyte_v<char_type>) {
-			if (0 != (partial = (n_bytes+partial)%sizeof(char_type))) {
-				// A character has been partially read
-				// TODO
-			}
-			return (n_bytes+partial)/sizeof(char_type);
-		}
-		if (n_bytes == 0) {
-			return 0;
-		}
-		return n_bytes/sizeof(char_type);
+		// Successfully flushed whole buffer
+		reset_put_buf();
+		return true;
 	}
 
 	std::size_t buffered_internal_read()
@@ -396,24 +336,14 @@ private:
 			offset = 1;
 		}
 		buffer_view_type buf_view{buf+offset, buf_size-offset};
-		const auto n_bytes = pipe_read(buf_view);
-		if (n_bytes == 0) {
+		const auto n_chars = pipe_read(buf_view);
+		if (n_chars == 0) {
 			return 0;
 		}
 		if (offset not_eq 0) {
 			// Needed for putback/unget
 			*buf = putback;
 		}
-		const auto n_chars = n_bytes/sizeof(char_type);
-		/* TODO
-		if constexpr (is_multibyte_v<char_type>) {
-			if (0 != (partial = (n_bytes+partial)%sizeof(char_type))) {
-				// A character has been partially read
-				// TODO
-			}
-			//return (n_bytes+partial)/sizeof(char_type);
-		}
-		*/
 		this->setg(buf, buf_view.data(), buf_view.data()+n_chars);
 		return n_chars;
 	}
@@ -421,8 +351,7 @@ private:
 	std::size_t buffered_aux_read(buffer_view_type client_buf)
 	{
 		string_type aux(client_buf.size()+buf_size-1L, char_type{}); // -1 for putback copy
-		const auto n_bytes = pipe_read(buffer_view_type{aux});
-		const auto n_chars = n_bytes/sizeof(char_type);
+		const auto n_chars = pipe_read(buffer_view_type{aux});
 		if (0 == n_chars) {
 			// No data were read from pipe, indicating EOF
 			return 0;
@@ -452,7 +381,42 @@ private:
 		if (n_bytes <= 0) {
 			return 0;
 		}
-		return n_bytes;
+		const auto n_chars = n_bytes/sizeof(char_type);
+		/* TODO
+		if constexpr (is_multibyte_v<char_type>) {
+			if (0 != (partial = (n_bytes+partial)%sizeof(char_type))) {
+				// A character has been partially read
+				// TODO
+			}
+			return (n_bytes+partial)/sizeof(char_type);
+		}
+		*/
+		return n_chars;
+	}
+
+	std::size_t pipe_write(const string_view_type buf_view)
+	{
+		if (not pipe_fd.has_valid_fd()) {
+			// Pipe is not correctly setup, return early
+			return 0;
+		}
+		// TODO probably not here but if partial is not 0 then we need to slightly adjust the string given to fd.write to also include rest of partial
+		const auto n_bytes = pipe_fd.write(buf_view);
+		if (n_bytes <= 0) {
+			return 0;
+		}
+		const auto n_chars = n_bytes/sizeof(char_type);
+		/* TODO
+		if constexpr (is_multibyte_v<char_type>) {
+			bool partial_written = n_bytes%sizeof(char_type);
+			// TODO need to ensure that ojn partial write it is still counted as full char written on return type
+			// if partial written, put the rest into buffer and setup ptr and partial counter to note how much is available in buffer and where
+			// but what to do if second write is also partial, so if previous was partial, and this one also (n-partial)/sizeof(char_type) than we had again a partial write, then setup partial and buf and ptr again
+			// A character has been partially written
+			return (n_bytes+partial)/sizeof(char_type);
+		}
+		*/
+		return n_chars;
 	}
 
 	void reset_put_buf() noexcept
