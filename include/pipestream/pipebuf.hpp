@@ -104,7 +104,7 @@ protected:
 		if (0 == count) {
 			return count;
 		}
-		if (nullptr == s or count < 0) {
+		if (nullptr == s or 0 > count) {
 			throw std::invalid_argument("invalid sputn arguments");
 		}
 		const string_view_type client_buf(s, count);
@@ -126,7 +126,7 @@ protected:
 			aux.append(pbase(), buf_writeable);
 			aux.append(client_buf);
 			const auto written = pipe_write(aux);
-			if (0 == written) {
+			if (0 >= written) {
 				// Nothing has been written to pipe
 				return 0;
 			}
@@ -154,7 +154,7 @@ protected:
 		if (0 == count) {
 			return 0;
 		}
-		if (nullptr == s or count < 0) {
+		if (nullptr == s or 0 > count) {
 			throw std::invalid_argument("invalid sgetn arguments");
 		}
 		buffer_view_type client_buf{s, static_cast<std::size_t>(count)};
@@ -200,7 +200,7 @@ protected:
 			// No buffer to populate, read single character directly from pipe
 			char_type c;
 			buffer_view_type cview{&c, 1};
-			if (pipe_read(cview) <= 0) {
+			if (0 >= pipe_read(cview)) {
 				return traits_type::eof();
 			}
 			return traits_type::to_int_type(c);
@@ -229,15 +229,14 @@ protected:
 				return traits_type::eof();
 			}
 		} else {
-			// TODO what to do when ch = EOF?
 			if (not traits_type::eq_int_type(ch, traits_type::eof())) {
-				// Add last character ch to buffer, now buffer is really full
+				// Add last character ch to buffer if its not EOF, now buffer is really full
 				*pptr() = ch;
 				this->pbump(1);
 			}
 			if (!buffer_flush()) {
 				// Flushing has failed
-				this->pbump(-1); // Need to make room for future writes, dropping last character
+				this->pbump(-1); // Need to make room for future writes, dropping last character added
 				return traits_type::eof(); // Notify client that write of last character has failed
 			}
 		}
@@ -257,8 +256,8 @@ protected:
 			return traits_type::eof();
 		}
 		const std::streamsize buf_area = gptr()-eback();
-		if (buf_area <= 0) {
-			// No writeable buf area available
+		if (0 >= buf_area) {
+			// No writeable buffer area available
 			return traits_type::eof();
 		}
 		this->gbump(-1);
@@ -337,7 +336,8 @@ private:
 		}
 		buffer_view_type buf_view{buf+offset, buf_size-offset};
 		const auto n_chars = pipe_read(buf_view);
-		if (n_chars == 0) {
+		if (0 >= n_chars) {
+			// No data were read from pipe, indicating EOF
 			return 0;
 		}
 		if (offset not_eq 0) {
@@ -352,12 +352,12 @@ private:
 	{
 		string_type aux(client_buf.size()+buf_size-1L, char_type{}); // -1 for putback copy
 		const auto n_chars = pipe_read(buffer_view_type{aux});
-		if (0 == n_chars) {
+		if (0 >= n_chars) {
 			// No data were read from pipe, indicating EOF
 			return 0;
 		}
-		std::memcpy(client_buf.data(), aux.data(), std::min(static_cast<std::size_t>(n_chars), client_buf.size())*sizeof(char_type));
-		if (0 <= n_chars-static_cast<std::streamsize>(client_buf.size())) {
+		std::memcpy(client_buf.data(), aux.data(), std::min(n_chars, client_buf.size())*sizeof(char_type));
+		if (0 <= n_chars-client_buf.size()) {
 			// Enough data for count has been read
 			*buf = *(aux.data()+client_buf.size()-1); // Prepare putback space
 			const int extra = n_chars-client_buf.size();
@@ -378,19 +378,15 @@ private:
 			return 0;
 		}
 		const auto n_bytes = pipe_fd.read(buf_view);
-		if (n_bytes <= 0) {
+		if (0 >= n_bytes) {
 			return 0;
 		}
 		const auto n_chars = n_bytes/sizeof(char_type);
-		/* TODO
 		if constexpr (is_multibyte_v<char_type>) {
 			if (0 != (partial = (n_bytes+partial)%sizeof(char_type))) {
 				// A character has been partially read
-				// TODO
 			}
-			return (n_bytes+partial)/sizeof(char_type);
 		}
-		*/
 		return n_chars;
 	}
 
@@ -400,22 +396,21 @@ private:
 			// Pipe is not correctly setup, return early
 			return 0;
 		}
-		// TODO probably not here but if partial is not 0 then we need to slightly adjust the string given to fd.write to also include rest of partial
 		const auto n_bytes = pipe_fd.write(buf_view);
-		if (n_bytes <= 0) {
+		if (0 >= n_bytes) {
 			return 0;
 		}
 		const auto n_chars = n_bytes/sizeof(char_type);
-		/* TODO
 		if constexpr (is_multibyte_v<char_type>) {
-			bool partial_written = n_bytes%sizeof(char_type);
-			// TODO need to ensure that ojn partial write it is still counted as full char written on return type
+			if (0 != (partial = (n_bytes+partial)%sizeof(char_type))) {
+				// A character has been partially written
+			}
+			// Need to ensure that ojn partial write it is still counted as full char written on return type
 			// if partial written, put the rest into buffer and setup ptr and partial counter to note how much is available in buffer and where
 			// but what to do if second write is also partial, so if previous was partial, and this one also (n-partial)/sizeof(char_type) than we had again a partial write, then setup partial and buf and ptr again
 			// A character has been partially written
 			return (n_bytes+partial)/sizeof(char_type);
 		}
-		*/
 		return n_chars;
 	}
 

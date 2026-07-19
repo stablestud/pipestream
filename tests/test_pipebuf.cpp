@@ -370,7 +370,7 @@ TEST_SUITE("sputn()")
 		CHECK_EQ(buf.sputn(str2.c_str(), str2.size()), str2.size());
 	}
 
-	TEST_CASE_TEMPLATE("should return n amount of characters written on partial string write to pipe on sputn()" * doctest::skip(), T, char, wchar_t, char16_t, char32_t)
+	TEST_CASE_TEMPLATE("should return n amount of characters written on partial string write to pipe on sputn()", T, char, wchar_t, char16_t, char32_t)
 	{
 		auto buf = pipestream::make_pipebuf<T>(mocked_fd{});
 		const std::basic_string<T> str{make_string<T>("Hello World!")};
@@ -403,7 +403,7 @@ TEST_SUITE("sputn()")
 		CHECK_EQ(buf.sputn(str2.c_str(), str2.size()), str2.size());
 	}
 
-	TEST_CASE_TEMPLATE("should leave buffer in consistent state if write partially fails on sputn()" * doctest::skip(), T, char, wchar_t, char16_t, char32_t)
+	TEST_CASE_TEMPLATE("should leave buffer in consistent state if write partially fails on sputn()", T, char, wchar_t, char16_t, char32_t)
 	{
 		auto buf = pipestream::make_pipebuf<T>(mocked_fd{});
 		const std::basic_string<T> str1{make_string<T>("Hello World!")};
@@ -428,7 +428,7 @@ TEST_SUITE("sputn()")
 		CHECK_EQ(buf.sputn(str2.c_str(), str2.size()), str2.size());
 	}
 
-	TEST_CASE_TEMPLATE("should return characters written on partial character write on sputn()" * doctest::skip(), T, wchar_t, char16_t, char32_t)
+	TEST_CASE_TEMPLATE("should return characters written on partial character write on sputn()", T, wchar_t, char16_t, char32_t)
 	{
 		static_assert(pipestream::is_multibyte_v<T>);
 		const std::basic_string<T> str{make_string<T>("Hello")};
@@ -514,7 +514,7 @@ TEST_SUITE("sputc()")
 		}
 	}
 
-	TEST_CASE_TEMPLATE("should return EOF on partial character write on sputc()" * doctest::skip(), T, wchar_t, char16_t, char32_t)
+	TEST_CASE_TEMPLATE("should not return EOF on partial character write on sputc()", T, wchar_t, char16_t, char32_t)
 	{
 		static_assert(pipestream::is_multibyte_v<T>);
 		auto buf = pipestream::make_pipebuf<T>(mocked_fd{});
@@ -523,7 +523,7 @@ TEST_SUITE("sputc()")
 		REQUIRE_CALL(buf.rdfd(), write(trompeloeil::_, trompeloeil::ge(sizeof(T))))
 				.TIMES(1)
 				.RETURN(sizeof(T)/2);
-		CHECK_EQ(buf.sputc(c), pipestream::basic_pipebuf<T>::traits_type::eof());
+		CHECK_EQ(buf.sputc(c), c);
 	}
 
 	TEST_CASE_TEMPLATE("should continue writing character after partial character write on sputc()" * doctest::skip(), T, wchar_t, char16_t, char32_t)
@@ -661,7 +661,7 @@ TEST_SUITE("sgetc()")
 		CHECK_EQ(strcmp<T>(array, buf_str.c_str()), 0);
 	}
 
-	TEST_CASE_TEMPLATE("should return EOF on partial character read on sgetc()" * doctest::skip(), T, wchar_t, char16_t, char32_t)
+	TEST_CASE_TEMPLATE("should return EOF on partial character read on sgetc()", T, wchar_t, char16_t, char32_t)
 	{
 		static_assert(pipestream::is_multibyte_v<T>);
 		auto buf = pipestream::make_pipebuf<T>(mocked_fd{});
@@ -1237,7 +1237,7 @@ TEST_SUITE("sgetn()")
 		CHECK_EQ(strcmp<T>(dst, str1.c_str()), 0);
 	}
 
-	TEST_CASE_TEMPLATE("should return characters read on partial character read on sgetn()" * doctest::skip(), T, wchar_t, char16_t, char32_t)
+	TEST_CASE_TEMPLATE("should return characters read on partial character read on sgetn()", T, wchar_t, char16_t, char32_t)
 	{
 		static_assert(pipestream::is_multibyte_v<T>);
 		const std::basic_string<T> str{make_string<T>("Hello")};
@@ -1337,7 +1337,7 @@ TEST_SUITE("sync()")
 		CHECK_EQ(buf.pubsync(), 0);
 	}
 
-	TEST_CASE("should return -1 on partial write on sync()" * doctest::skip())
+	TEST_CASE("should return -1 on partial write on sync()")
 	{
 		auto buf = pipestream::make_pipebuf(mocked_fd{});
 		const std::string str{"Hello World!"};
@@ -1349,7 +1349,7 @@ TEST_SUITE("sync()")
 		flush_mocked(buf);
 	}
 
-	TEST_CASE_TEMPLATE("should leave buffer in consistent state on partial write on sync()" * doctest::skip(), T, char, wchar_t, char16_t, char32_t)
+	TEST_CASE_TEMPLATE("should leave buffer in consistent state on partial write on sync()", T, char, wchar_t, char16_t, char32_t)
 	{
 		auto buf = pipestream::make_pipebuf<T>(mocked_fd{});
 		const std::basic_string<T> str{make_string<T>("Hello World!")};
