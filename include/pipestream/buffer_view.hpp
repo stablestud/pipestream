@@ -9,7 +9,8 @@ namespace pipestream
 /* Reimplementing span like structure
  * as std::string_view is read-only but we also need to be able to write to it.
  * And std::string cannot be used as it manages its own memory.
- * Therefore this has been created as std::span only exists in C++20 and onwards
+ * Therefore this has been created as std::span only exists in C++20 and onwards 
+ * (We target C++17)
  */
 template<typename CharT>
 class buffer_view {

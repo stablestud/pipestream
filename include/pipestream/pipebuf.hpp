@@ -41,9 +41,9 @@ public:
 	using std::basic_streambuf<CharT,Traits>::epptr;
 	using std::basic_streambuf<CharT,Traits>::egptr;
 
-	using buffer_view_type = pipestream::buffer_view<CharT>;
-	using string_type = std::basic_string<CharT, Traits>;
-	using string_view_type = std::basic_string_view<CharT, Traits>;
+	using buffer_view_type = pipestream::buffer_view<char_type>;
+	using string_type      = std::basic_string<char_type, traits_type>;
+	using string_view_type = std::basic_string_view<char_type, traits_type>;
 
 	basic_pipebuf(Fd&& move_fd) : pipe_fd(std::move(move_fd))
 	{
@@ -177,27 +177,22 @@ protected:
 			// Read missing data from pipe
 			return this->xsgetn(client_buf.data()+buf_readable, client_buf.size()-buf_readable)+buf_readable;
 		}
-		string_type aux(client_buf.size()+buf_size-1L, char_type{}); // -1 for putback copy
-		const std::streamsize n_chars = pipe_read(buffer_view_type{aux});
-		if (0 >= n_chars) {
-			// No data were read from pipe, indicating EOF
-			return 0;
-		}
-		std::memcpy(client_buf.data(), aux.data(), std::min(static_cast<std::size_t>(n_chars), client_buf.size())*sizeof(char_type));
-		if (0 <= n_chars-static_cast<std::streamsize>(client_buf.size())) {
-			// Enough data for count has been read
-			*buf = *(aux.data()+client_buf.size()-1); // Prepare putback space
-			const int extra = n_chars-client_buf.size();
-			if (0 < extra) {
-				// More data than needed for count has been read,
-				// move extra data into buffer
-				std::memcpy(buf+1, aux.data()+client_buf.size(), extra*sizeof(char_type));
+		if (buf_size/2 > client_buf.size()) {
+			// Populate buffer and reread from buffer if requested size is half length of buffer
+			// This avoids usage of auxilary buffer and therefore avoids copying from aux to internal buffer on small requests
+			if (0 == buffered_internal_read()) {
+				return 0;
 			}
-			this->setg(buf, buf+1, buf+1+extra);
-			return client_buf.size();
+			return this->xsgetn(s, count);
 		}
-		// Less than required count have been read, try again
-		return this->xsgetn(client_buf.data()+n_chars, client_buf.size()-n_chars)+n_chars;
+		// Optimization: reduce syscalls by using aux buffer if requested size is atleast half size of internal buffer
+		// With that we try to fetch as much data as possible with as single requst without leaving the internal buffer half consumed
+		const auto n_chars = buffered_aux_read(client_buf);
+		if (client_buf.size() > n_chars) {
+			// Less than required count have been read, try again
+			return this->xsgetn(client_buf.data()+n_chars, client_buf.size()-n_chars)+n_chars;
+		}
+		return client_buf.size();
 	}
 
 	virtual int_type underflow() override
@@ -206,28 +201,14 @@ protected:
 			// No buffer to populate, read single character directly from pipe
 			char_type c;
 			buffer_view_type cview{&c, 1};
-			if (pipe_read(cview) <= 0) {
+			if (unbuffered_read(cview) <= 0) {
 				return traits_type::eof();
 			}
 			return traits_type::to_int_type(c);
 		}
-		char_type putback;
-		std::streamsize offset{};
-		if (egptr() not_eq eback()) {
-			// Buffer is populated (not empty)
-			putback = *(egptr()-1);
-			offset = 1;
-		}
-		buffer_view_type buf_view{buf+offset, buf_size-offset};
-		const std::streamsize n_chars = pipe_read(buf_view);
-		if (n_chars <= 0) {
+		if (0 == buffered_internal_read()) {
 			return traits_type::eof();
 		}
-		if (offset not_eq 0) {
-			// Needed for putback/unget
-			*buf = putback;
-		}
-		this->setg(buf, buf_view.data(), buf_view.data()+n_chars);
 		return traits_type::to_int_type(*gptr());
 	}
 
@@ -300,7 +281,7 @@ private:
 	std::size_t partial{};
 	std::unique_ptr<char_type[]> self_managed;
 
-	bool flush() noexcept
+	bool flush()
 	{
 		if (pbase() == pptr()) {
 			// Nothing to flush, return early
@@ -343,7 +324,7 @@ private:
 		}
 	}
 
-	std::streamsize unbuffered_write(const string_view_type client_buf) noexcept
+	std::streamsize unbuffered_write(const string_view_type client_buf)
 	{
 		if (not pipe_fd.has_valid_fd()) {
 			// Pipe is not correctly setup, return early
@@ -365,7 +346,7 @@ private:
 		return n/sizeof(char_type);
 	}
 
-	std::streamsize pipe_write(const string_view_type buf_view) noexcept
+	std::streamsize pipe_write(const string_view_type buf_view)
 	{
 		if (not pipe_fd.has_valid_fd()) {
 			// Pipe is not correctly setup, return early
@@ -388,64 +369,90 @@ private:
 		return n/sizeof(char_type);
 	}
 
-	std::streamsize unbuffered_read(buffer_view_type client_buf) noexcept
+	std::size_t unbuffered_read(buffer_view_type client_buf)
 	{
-		if (not pipe_fd.has_valid_fd()) {
-			// Pipe is not correctly setup, return early
-			return 0;
-		}
-		const std::streamsize n = pipe_fd.read(client_buf);
+		const auto n_bytes = pipe_read(client_buf);
 		if constexpr (is_multibyte_v<char_type>) {
-			if (0 != (partial = (n+partial)%sizeof(char_type))) {
+			if (0 != (partial = (n_bytes+partial)%sizeof(char_type))) {
 				// A character has been partially read
 				// TODO
 			}
-			return (n+partial)/sizeof(char_type);
+			return (n_bytes+partial)/sizeof(char_type);
 		}
-		if (n <= 0) {
+		if (n_bytes == 0) {
 			return 0;
 		}
-		return n/sizeof(char_type);
+		return n_bytes/sizeof(char_type);
 	}
 
-	std::streamsize buffered_read(buffer_view_type client_buf) noexcept
+	std::size_t buffered_internal_read()
 	{
-		if (not pipe_fd.has_valid_fd()) {
-			// Pipe is not correctly setup, return early
+		char_type putback;
+		std::streamsize offset{};
+		if (egptr() not_eq eback()) {
+			// Buffer is populated (not empty),
+			// therefore we need to persist last buffer entry for putback 
+			putback = *(egptr()-1);
+			offset = 1;
+		}
+		buffer_view_type buf_view{buf+offset, buf_size-offset};
+		const auto n_bytes = pipe_read(buf_view);
+		if (n_bytes == 0) {
 			return 0;
 		}
-		const std::streamsize n = pipe_fd.read(buf.data(), sizeof(char_type) * buf.size());
+		if (offset not_eq 0) {
+			// Needed for putback/unget
+			*buf = putback;
+		}
+		const auto n_chars = n_bytes/sizeof(char_type);
+		/* TODO
 		if constexpr (is_multibyte_v<char_type>) {
-			if (0 != (partial = (n+partial)%sizeof(char_type))) {
+			if (0 != (partial = (n_bytes+partial)%sizeof(char_type))) {
 				// A character has been partially read
 				// TODO
 			}
-			return (n+partial)/sizeof(char_type);
+			//return (n_bytes+partial)/sizeof(char_type);
 		}
-		if (n <= 0) {
-			return 0;
-		}
-		return n/sizeof(char_type);
+		*/
+		this->setg(buf, buf_view.data(), buf_view.data()+n_chars);
+		return n_chars;
 	}
 
-	std::streamsize pipe_read(buffer_view_type buf_view) noexcept
+	std::size_t buffered_aux_read(buffer_view_type client_buf)
 	{
-		if (not pipe_fd.has_valid_fd()) {
-			// Pipe is not correctly setup, return early
+		string_type aux(client_buf.size()+buf_size-1L, char_type{}); // -1 for putback copy
+		const auto n_bytes = pipe_read(buffer_view_type{aux});
+		const auto n_chars = n_bytes/sizeof(char_type);
+		if (0 == n_chars) {
+			// No data were read from pipe, indicating EOF
 			return 0;
 		}
-		const std::streamsize n = pipe_fd.read(buf_view);
-		if constexpr (is_multibyte_v<char_type>) {
-			if (0 != (partial = (n+partial)%sizeof(char_type))) {
-				// A character has been partially read
-				// TODO
+		std::memcpy(client_buf.data(), aux.data(), std::min(static_cast<std::size_t>(n_chars), client_buf.size())*sizeof(char_type));
+		if (0 <= n_chars-static_cast<std::streamsize>(client_buf.size())) {
+			// Enough data for count has been read
+			*buf = *(aux.data()+client_buf.size()-1); // Prepare putback space
+			const int extra = n_chars-client_buf.size();
+			if (0 < extra) {
+				// More data than needed for count has been read,
+				// move extra data into buffer
+				std::memcpy(buf+1, aux.data()+client_buf.size(), extra*sizeof(char_type));
 			}
-			return (n+partial)/sizeof(char_type);
+			this->setg(buf, buf+1, buf+1+extra);
 		}
-		if (n <= 0) {
+		return n_chars;
+	}
+
+	std::size_t pipe_read(buffer_view_type buf_view)
+	{
+		if (not pipe_fd.has_valid_fd() or buf_view.empty()) {
+			// Pipe or buffer not correctly setup, return early
 			return 0;
 		}
-		return n/sizeof(char_type);
+		const auto n_bytes = pipe_fd.read(buf_view);
+		if (n_bytes <= 0) {
+			return 0;
+		}
+		return n_bytes;
 	}
 
 	void reset_put_buf() noexcept
